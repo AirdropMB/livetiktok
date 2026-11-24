@@ -95,7 +95,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
   <div id="aibox" hidden><h4>AI viết câu hỏi</h4><input id="aitopic" placeholder="Chủ đề (để trống = tổng hợp)">
   <div class="g"><button id="aigo">AI tạo 10 câu mới</button><button id="aiauto">Tự động bổ sung: bật</button></div><small id="aist">Sẵn sàng. Câu AI viết hiện ở dưới, bấm × để xóa câu bạn không ưng.</small><div id="ailist"></div></div>
   <h4>Âm nhạc</h4><label>Nhạc nền riêng (tùy chọn)<input type="file" accept="audio/*" id="bgf"></label><label>Thêm bài cho quiz nhạc (tên file = tên bài)<input type="file" accept="audio/*" multiple id="mf"></label><label>Thêm bài hot mới từ web (mỗi dòng: Tên bài - Ca sĩ)<textarea id="nm" rows="3" placeholder="Bắc Bling - Hòa Minzy"></textarea></label><button id="addm">Tìm &amp; thêm nhạc từ web</button>
-  <small id="mc">Chưa thêm nhạc: đang dùng 7 giai điệu có sẵn.</small><details><summary>Tên file gợi ý (bài hot)</summary><small id="hl"></small></details>
+  <small id="mc">Đang tải nhạc hot Việt Nam từ web...</small><details><summary>Tên file gợi ý (bài hot)</summary><small id="hl"></small></details>
   <h4>Thêm câu hỏi</h4>
   <textarea id="nq" rows="4" placeholder="Mỗi dòng: Câu hỏi | A | B | C | D | đáp án đúng (A-D)"></textarea>
   <button id="addq">Thêm vào ngân hàng</button> <small id="qc"></small>
@@ -104,7 +104,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 </aside>
 <script>
 /* ===== CẤU HÌNH ===== */
-const CFG={seconds:10,revealSeconds:7,musicEvery:4,clipSeconds:10,useBuiltin:false,bgmVol:.5,voiceRate:1.05,likeTarget:100,followPoints:30,bridge:'ws://127.0.0.1:21213/',
+const CFG={seconds:10,revealSeconds:7,musicEvery:3,clipSeconds:10,useBuiltin:false,bgmVol:.5,voiceRate:1.05,likeTarget:100,followPoints:30,bridge:'ws://127.0.0.1:21213/',
   // Quà theo số kim cương TikTok (giá trị thật của quà). Tên quà hiển thị lấy thẳng từ TikTok.
   tiers:[
    {min:1000,type:'mega',sec:5,mult:3,eg:'Galaxy',label:'+5 giây & x3 điểm'},
@@ -113,7 +113,7 @@ const CFG={seconds:10,revealSeconds:7,musicEvery:4,clipSeconds:10,useBuiltin:fal
    {min:1,type:'pts',pts:20,eg:'Rose',label:'+20 điểm'}]};
 const tierOf=v=>CFG.tiers.find(t=>v>=t.min);
 const GUIDE=['💬 Gõ A, B, C hoặc D vào bình luận để trả lời','⚡ Trả lời càng nhanh càng nhiều điểm','🔥 Đúng liên tiếp để nhận điểm thưởng chuỗi',
- ...CFG.tiers.slice().reverse().map(t=>'🎁 '+t.eg+' ('+t.min+'+ 💎): '+t.label),'🎵 Cứ 4 câu có 1 câu nghe nhạc đoán bài hát','❤ Cả phòng thả đủ tim: x2 điểm câu tiếp theo','➕ Follow để nhận ngay +30 điểm'];
+ ...CFG.tiers.slice().reverse().map(t=>'🎁 '+t.eg+' ('+t.min+'+ 💎): '+t.label),'🎵 Cứ '+CFG.musicEvery+' câu có 1 câu nghe nhạc đoán bài hát','❤ Cả phòng thả đủ tim: x2 điểm câu tiếp theo','➕ Follow để nhận ngay +30 điểm'];
 /* Ngân hàng câu hỏi MỚI: [câu hỏi, đáp án đúng, sai, sai, sai]. Đáp án được xáo vị trí khi hiện. */
 const BANK=[
  ['Chùa Một Cột nằm ở thành phố nào?','Hà Nội','Huế','Hải Phòng','Nam Định'],
@@ -170,6 +170,9 @@ const BANK=[
 /* ===================== */
 let used=new Set();try{used=new Set(JSON.parse(localStorage.getItem('quizUsed')||'[]'))}catch(_){}
 const saveUsed=()=>{try{localStorage.setItem('quizUsed',JSON.stringify([...used]))}catch(_){}};
+/* Bài nhạc đã phát (lưu theo tên bài): mỗi bài chỉ phát 1 lần, giống câu hỏi */
+let usedM=new Set(),musicMsg=false;try{usedM=new Set(JSON.parse(localStorage.getItem('quizUsedMusic')||'[]'))}catch(_){}
+const saveUsedM=()=>{try{localStorage.setItem('quizUsedMusic',JSON.stringify([...usedM]))}catch(_){}};
 const $=id=>document.getElementById(id),L='ABCD',stage=$('stage');
 let n=0,phase='idle',left=0,total=0,answers=new Map(),scores=new Map(),seen=new Set(),AV=new Map(),mult=1,pendMult=1,likes=0,timer=null,queue=[],cur=null,lastC=0,first=false,botT=null,procSeen=new Set(),procMsg=false,qseq=0,NICK=new Map(),voiceOn=true,bgmOn=true,mq=[],clipStop=null;
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -189,26 +192,21 @@ const sfx={tick:()=>tone(880,0,.08,'square',.05),join:()=>tone(660,0,.1,'triangl
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const mel=t=>t.split(' ').map(x=>{const[a,b]=x.split(':');return[+a,+(b||1)]});
 // Giai điệu dân gian / phạm vi công cộng, tự tổng hợp bằng trình duyệt (không cần file nhạc)
-const MUSIC=[
- {title:'Chúc mừng sinh nhật',notes:mel('67:.75 67:.25 69 67 72 71:2 67:.75 67:.25 69 67 74 72:2')},
- {title:'Ngôi sao nhỏ (Twinkle Twinkle)',notes:mel('60 60 67 67 69 69 67:2 65 65 64 64 62 62 60:2')},
- {title:'Ode to Joy (Beethoven)',notes:mel('64 64 65 67 67 65 64 62 60 60 62 64 64:1.5 62:.5 62:2')},
- {title:'Jingle Bells',notes:mel('64 64 64:2 64 64 64:2 64 67 60:1.5 62:.5 64:4')},
- {title:'Anh Jacques (Frère Jacques)',notes:mel('60 62 64 60 60 62 64 60 64 65 67:2 64 65 67:2')},
- {title:'Für Elise (Beethoven)',notes:mel('76:.5 75:.5 76:.5 75:.5 76:.5 71:.5 74:.5 72:.5 69:1.5')},
- {title:'Mary Had a Little Lamb',notes:mel('64 62 60 62 64 64 64:2 62 62 62:2 64 67 67:2')}];
-const DECOYS=['Silent Night','Auld Lang Syne','Row Row Row Your Boat','Canon in D','Swan Lake','Con cò bé bé','Bắc kim thang','Lý cây bàng'];
+const MUSIC=[]; // chỉ gồm bài lấy từ web (iTunes) hoặc file bạn thêm
+const DECOYS=['Nàng Thơ','Em Của Ngày Hôm Qua','Có Chàng Trai Viết Lên Cây','Đế Vương','Chạy Về Khóc Với Anh','Bài Này Chill Phết','Đi Về Nhà','Ngày Đầu Tiên','Muộn Rồi Mà Sao Còn','Hồng Nhan'];
 /* Danh sách bài hot (tên bài - ca sĩ) lấy từ BXH Billboard Vietnam Hot 100 và các bài nổi tiếng gần đây.
    Dùng để: (1) làm đáp án nhiễu, (2) tự nhận diện tên file (gõ không dấu cũng được). Bạn tự thêm/bớt bài mới ở đây. */
-const HOT=[['Bắc Bling','Hòa Minzy'],['Phép Màu','MAYDAYs'],['Một Đời','14 Casper & Bon Nghiêm'],['Bình Yên','Vũ. & Binz'],['Mất Kết Nối','Dương Domic'],
+const HOT=[['xương rồng','Dangrangto'],['để dành cho em','Dangrangto'],['Tìm Em','Hngle'],['chờ chút','TINH HÀ'],['Như Một Người Rưng','OSAD'],['Và Thế Giới Đã Mất Đi Một Người Cô Đơn','marzuz'],['In Love','Low G'],['vaicaunoicokhiennguoithaydoi','GREY D'],['TỪNG QUEN','Wren Evans'],['Chuyện Đôi Ta','Da LAB'],['Anh Đã Quen Với Cô Đơn','Soobin'],['dự báo thời tiết hôm nay mưa','GREY D'],['Thằng Điên','JustaTee'],['Exit Sign','HIEUTHUHAI'],['Dạo Này','Obito'],['LƯU NIÊN','Jack'],['Ai Ngoài Anh','VSTRA'],['Ngày Rời Chuyến Bay','Minh Huy'],['Nhẹ Buông','Hằng ssi'],['Từng Là Của Nhau','Bảo Anh'],['Bông Hoa Đẹp Nhất','Quân A.P'],['Người Im Lặng Gặp Người Hay Nói','HIEUTHUHAI'],['nếu lúc đó','tlinh'],['Có Đôi Điều','Shiki'],["Ex's Hate Me",'B Ray'],['giá như','SOOBIN'],['Cơn Mưa Cuối','JustaTee'],['Em Đã Biết','SUNI'],['Tò Te Tí','Wren Evans'],['CỨ THẾ','Orange'],['24h','Lyly'],['NOLOVENOLIFE','HIEUTHUHAI'],['Cảm Ơn Người Đã Thức Cùng Tôi','Phùng Khánh Linh'],['Còn Gì Đẹp Hơn','Nguyễn Hùng'],['Bóng Phù Hoa','Phương Mỹ Chi'],['Nấu Ăn Cho Em','Đen'],['Come My Way','Sơn Tùng M-TP'],['Em','Binz'],['Gói Con Tim Làm Quà','Nguyễn Hùng'],['Thế Nào Là Đúng','Bảo Anh'],['Tìm Thấy Nhau','SIVAN'],['Bắc Bling','Hòa Minzy'],['Phép Màu','MAYDAYs'],['Một Đời','14 Casper & Bon Nghiêm'],['Bình Yên','Vũ. & Binz'],['Mất Kết Nối','Dương Domic'],
  ['Buông Đôi Tay Nhau Ra','Sơn Tùng M-TP'],['Âm Thầm Bên Em','Sơn Tùng M-TP'],['Có Chắc Yêu Là Đây','Sơn Tùng M-TP'],['Chúng Ta Của Hiện Tại','Sơn Tùng M-TP'],['Lạc Trôi','Sơn Tùng M-TP'],
  ['Không Buông','HNGLE & ARI'],['Kho Báu','(S)TRONG Trọng Hiếu'],['Vùng An Toàn','B Ray & V#'],['Mơ','Vũ Cát Tường'],['Người Đầu Tiên','Juky San'],
  ['Anh Đã Không Biết Cách Yêu Em','Quang Đăng Trần'],['Gặp Lại Năm Ta 60','Orange'],['Tiếc Cho Em','RHYDER'],['Hãy Trao Cho Anh','Sơn Tùng M-TP'],['Nơi Này Có Anh','Sơn Tùng M-TP'],['Chạy Ngay Đi','Sơn Tùng M-TP'],['Waiting For You','MONO']];
 const norm=t=>String(t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 function parseSong(name,url){const base=name.replace(/\.[^.]+$/,'').replace(/_+/g,' ').trim(),i=base.indexOf(' - ');let title=i>0?base.slice(0,i).trim():base,artist=i>0?base.slice(i+3).trim():'';
   const h=HOT.find(x=>norm(x[0])===norm(title));if(h){title=h[0];if(!artist)artist=h[1]}return{title,artist,url}}
-function pickMusic(){const custom=MUSIC.filter(m=>m.url),src=custom.length&&!CFG.useBuiltin?custom:MUSIC;if(!mq.length)mq=shuffle(src);const m=mq.pop(),seen=new Set([norm(m.title)]),pool=[];
-  [...(custom.length?MUSIC.filter(x=>x.url):MUSIC).map(x=>x.title),...HOT.map(x=>x[0]),...DECOYS].forEach(t=>{if(!seen.has(norm(t))){seen.add(norm(t));pool.push(t)}});
+function pickMusic(){const src=MUSIC.filter(x=>x.url&&!usedM.has(norm(x.title)));
+  if(!src.length){if(!musicMsg){musicMsg=true;notify('first','🎵 Chưa có bài mới để phát, bỏ qua câu nhạc')}return null}
+  const m=shuffle(src)[0];usedM.add(norm(m.title));saveUsedM();const seen=new Set([norm(m.title)]),pool=[];
+  [...MUSIC.map(x=>x.title),...HOT.map(x=>x[0]),...DECOYS].forEach(t=>{const k=norm(t);if(!seen.has(k)&&!usedM.has(k)){seen.add(k);pool.push(t)}});
   const o=shuffle([m.title,...shuffle(pool).slice(0,3)]);return{q:'🎵 Nghe nhạc đoán tên bài hát!',o,a:o.indexOf(m.title),music:m}}
 const midi=m=>440*2**((m-69)/12);
 function playClip(song){return new Promise(res=>{let done=false;const fin=()=>{if(done)return;done=true;clipStop=null;res()};
@@ -275,9 +273,9 @@ function itunes(term){return new Promise(res=>{const id='__it'+(++wid),sc=docume
 async function webSong(title,artist){if(MUSIC.some(m=>m.web&&norm(m.title)===norm(title)))return true;
   const r=await itunes(title+' '+artist),h=pickHit(r,title,artist);
   if(r===null){webFail++;return false}if(!h)return false;
-  MUSIC.push({title,artist,url:h.previewUrl,web:true});mq=[];webOk++;return true}
-function webStatus(){$('mc').textContent=webOk?'Nhạc từ web: đã lấy '+webOk+' bài hot. Cứ 4 câu có 1 câu nhạc.':webFail>2?'Bản này không tải được nhạc từ internet (trang web bị chặn). Dùng file tải về để có nhạc từ web, hoặc thêm file mp3 của bạn.':'Đang tìm nhạc từ web...'}
-(async()=>{for(const[t,a]of shuffle(HOT)){if(webFail>2)break;await webSong(t,a);webStatus();await sleep(350)}webStatus()})();
+  MUSIC.push({title,artist,url:h.previewUrl,web:true});mq=[];musicMsg=false;webOk++;return true}
+function webStatus(){$('mc').textContent=webOk?'Nhạc từ web: đã lấy '+webOk+' bài hot. Cứ '+CFG.musicEvery+' câu có 1 câu nhạc.':webFail>2?'Không tải được nhạc từ internet nên sẽ bỏ qua câu nhạc. Hãy mở file index.html trực tiếp trên máy, hoặc thêm file mp3 của bạn.':'Đang tìm nhạc từ web...'}
+(async()=>{const list=shuffle(HOT);let i=0;const worker=async()=>{while(i<list.length&&webFail<=2){const[t,a]=list[i++];await webSong(t,a);webStatus();await sleep(250)}};await Promise.all([worker(),worker(),worker()]);webStatus()})();
 $('addm').onclick=async()=>{const ls=$('nm').value.split('\n').map(l=>l.trim()).filter(Boolean);let k=0;
   for(const l of ls){const i=l.indexOf(' - '),t=i>0?l.slice(0,i).trim():l,a=i>0?l.slice(i+3).trim():'';
     if(!HOT.some(h=>norm(h[0])===norm(t)))HOT.push([t,a]);if(await webSong(t,a))k++}
@@ -311,7 +309,7 @@ function proc(){for(let t=0;t<50;t++){let q,c,k=Math.random()*3|0;
   return mk(q,String(c),[...w].map(String))}return mk('1 + 1 = ?','2',['1','3','4'])}
 function pick(){while(queue.length){const q=queue.pop();if(!used.has(q.q)){used.add(q.q);saveUsed();return mk(q.q,q.c,q.w)}}
   if(!procMsg){procMsg=true;notify('first','📚 Hết câu trong ngân hàng, chuyển sang câu toán ngẫu nhiên')}return proc()}
-async function nextQ(){const my=++qseq;if(aiAuto&&queue.length<=3)genAI();cancelAll();clearInterval(timer);n++;cur=(n%CFG.musicEvery===0)?pickMusic():pick();phase='intro';answers=new Map();first=false;mult=pendMult;pendMult=1;total=left=CFG.seconds;
+async function nextQ(){const my=++qseq;if(aiAuto&&queue.length<=3)genAI();cancelAll();clearInterval(timer);n++;cur=(n%CFG.musicEvery===0&&pickMusic())||pick();phase='intro';answers=new Map();first=false;mult=pendMult;pendMult=1;total=left=CFG.seconds;
   drawQ();$('fill').style.width='100%';$('fill').classList.remove('low');$('time').textContent='🔊';$('info').textContent='Đang đọc câu hỏi...';
   if(cur.music)bgmStop();else bgmStart();
   await speak(cur.music?'Quiz âm nhạc! Hãy lắng nghe và đoán tên bài hát.':'Câu số '+n+'. '+cur.q);if(my!==qseq)return;
@@ -356,7 +354,7 @@ $('bmute').onclick=()=>{bgmOn=!bgmOn;bgmLevel();$('st').textContent=bgmOn?'Đã 
 $('tmusic').onclick=()=>{if(!AC)startGame();else{n=CFG.musicEvery-1;if(phase==='reveal')nextQ();else reveal()}};
 $('bgf').onchange=e=>{const f=e.target.files[0];if(!f)return;if(bgm.el)bgm.el.pause();const a=new Audio(URL.createObjectURL(f));a.loop=true;bgm.el=a;clearInterval(bgm.timer);bgm.timer=null;try{AC.createMediaElementSource(a).connect(bgm.gain||(bgmStart(),bgm.gain))}catch(_){}if(bgm.want)bgmStart();$('mc').textContent='Nhạc nền: '+f.name};
 $('mf').onchange=e=>{const fs=[...e.target.files];fs.forEach(f=>MUSIC.push(parseSong(f.name,URL.createObjectURL(f))));mq=[];$('mc').textContent='Đã thêm '+fs.length+' bài. Quiz nhạc dùng '+MUSIC.filter(m=>m.url).length+' bài của bạn.'+(fs.length?' Mẫu: '+parseSong(fs[0].name).title+(parseSong(fs[0].name).artist?' – '+parseSong(fs[0].name).artist:''):'')};
-$('forget').onclick=()=>{used=new Set();saveUsed();queue=shuffle(BANK);procMsg=false;$('qc').textContent='Đã xóa lịch sử câu đã dùng'};
+$('forget').onclick=()=>{used=new Set();saveUsed();usedM=new Set();saveUsedM();musicMsg=false;queue=shuffle(BANK);procMsg=false;$('qc').textContent='Đã xóa lịch sử câu hỏi và bài nhạc đã dùng'};
 $('reset').onclick=()=>{scores=new Map();renderLB()};$('mute').onclick=()=>{muted=!muted;$('st').textContent=muted?'Đã tắt âm':'Đã bật âm'};
 const U=()=>$('u').value||'khach';
 document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>onChat(U(),b.dataset.c));
