@@ -110,7 +110,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 </aside>
 <script>
 /* ===== CẤU HÌNH ===== */
-const CFG={seconds:10,revealSeconds:7,musicEvery:3,clipSeconds:10,useBuiltin:false,bgmVol:.5,voiceRate:1.05,likeTarget:100,followPoints:30,bridge:'ws://127.0.0.1:21213/',
+const CFG={seconds:10,revealSeconds:7,musicEvery:2,clipSeconds:10,useBuiltin:false,bgmVol:.5,voiceRate:1.05,likeTarget:100,followPoints:30,bridge:'ws://127.0.0.1:21213/',
   // Quà theo số kim cương TikTok (giá trị thật của quà). Tên quà hiển thị lấy thẳng từ TikTok.
   tiers:[
    {min:1000,type:'mega',sec:5,mult:3,eg:'Galaxy',label:'+5 giây & x3 điểm'},
@@ -121,7 +121,27 @@ const tierOf=v=>CFG.tiers.find(t=>v>=t.min);
 const GUIDE=['💬 Gõ A, B, C hoặc D vào bình luận để trả lời','⚡ Trả lời càng nhanh càng nhiều điểm','🔥 Đúng liên tiếp để nhận điểm thưởng chuỗi',
  ...CFG.tiers.slice().reverse().map(t=>'🎁 '+t.eg+' ('+t.min+'+ 💎): '+t.label),'🎵 Cứ '+CFG.musicEvery+' câu có 1 câu nghe nhạc đoán bài hát','❤ Cả phòng thả đủ tim: x2 điểm câu tiếp theo','➕ Follow để nhận ngay +30 điểm'];
 /* Ngân hàng câu hỏi MỚI: [câu hỏi, đáp án đúng, sai, sai, sai]. Đáp án được xáo vị trí khi hiện. */
+const MQS=new Set(["Đàn bầu có mấy dây?", "Quốc ca Việt Nam có tên là gì?", "Ai là tác giả bài Tiến quân ca?", "Nhạc sĩ nào viết bài “Diễm xưa”?", "Bài “Nối vòng tay lớn” là của nhạc sĩ nào?", "“Hãy trao cho anh” là bài hát của ca sĩ nào?", "“Bắc Bling” do ca sĩ nào thể hiện?", "Đàn guitar tiêu chuẩn có mấy dây?", "Đàn piano tiêu chuẩn có bao nhiêu phím?", "Thang âm cơ bản có mấy nốt nhạc?", "Michael Jackson được mệnh danh là gì?", "Ban nhạc The Beatles đến từ nước nào?", "Beethoven là nhà soạn nhạc người nước nào?", "Mozart là nhà soạn nhạc người nước nào?", "Quan họ là dân ca của vùng nào?", "Đờn ca tài tử là loại hình nghệ thuật của vùng nào?", "Cồng chiêng là nhạc cụ gắn với vùng nào?", "Nhạc cụ nào sau đây thuộc bộ gõ?", "Bản “Für Elise” do ai sáng tác?"]);
 const BANK=[
+ ['Đàn bầu có mấy dây?','Một dây','Hai dây','Ba dây','Bốn dây'],
+ ['Quốc ca Việt Nam có tên là gì?','Tiến quân ca','Giải phóng miền Nam','Hồ Chí Minh hành khúc','Diệt phát xít'],
+ ['Ai là tác giả bài Tiến quân ca?','Văn Cao','Phạm Tuyên','Trịnh Công Sơn','Hoàng Việt'],
+ ['Nhạc sĩ nào viết bài “Diễm xưa”?','Trịnh Công Sơn','Văn Cao','Phạm Duy','Hoàng Quý'],
+ ['Bài “Nối vòng tay lớn” là của nhạc sĩ nào?','Trịnh Công Sơn','Phạm Tuyên','Phú Quang','Nguyễn Văn Chung'],
+ ['“Hãy trao cho anh” là bài hát của ca sĩ nào?','Sơn Tùng M-TP','Đen Vâu','Hoàng Thùy Linh','Soobin'],
+ ['“Bắc Bling” do ca sĩ nào thể hiện?','Hòa Minzy','Mỹ Tâm','Hồ Ngọc Hà','Đông Nhi'],
+ ['Đàn guitar tiêu chuẩn có mấy dây?','6 dây','4 dây','5 dây','7 dây'],
+ ['Đàn piano tiêu chuẩn có bao nhiêu phím?','88 phím','66 phím','76 phím','96 phím'],
+ ['Thang âm cơ bản có mấy nốt nhạc?','7 nốt','5 nốt','6 nốt','8 nốt'],
+ ['Michael Jackson được mệnh danh là gì?','Vua nhạc Pop','Vua nhạc Rock','Vua nhạc Jazz','Vua nhạc Country'],
+ ['Ban nhạc The Beatles đến từ nước nào?','Anh','Mỹ','Úc','Canada'],
+ ['Beethoven là nhà soạn nhạc người nước nào?','Đức','Pháp','Ý','Áo'],
+ ['Mozart là nhà soạn nhạc người nước nào?','Áo','Đức','Nga','Hungary'],
+ ['Quan họ là dân ca của vùng nào?','Bắc Ninh','Huế','Nghệ An','Cần Thơ'],
+ ['Đờn ca tài tử là loại hình nghệ thuật của vùng nào?','Nam Bộ','Bắc Bộ','Tây Nguyên','Duyên hải miền Trung'],
+ ['Cồng chiêng là nhạc cụ gắn với vùng nào?','Tây Nguyên','Đồng bằng sông Hồng','Tây Bắc','Đồng bằng sông Cửu Long'],
+ ['Nhạc cụ nào sau đây thuộc bộ gõ?','Trống','Sáo trúc','Đàn tranh','Kèn bầu'],
+ ['Bản “Für Elise” do ai sáng tác?','Beethoven','Mozart','Bach','Chopin'],
  ['Chùa Một Cột nằm ở thành phố nào?','Hà Nội','Huế','Hải Phòng','Nam Định'],
  ['Đảo lớn nhất Việt Nam là?','Phú Quốc','Cát Bà','Côn Đảo','Lý Sơn'],
  ['Đèo Hải Vân nằm giữa Huế và thành phố nào?','Đà Nẵng','Quy Nhơn','Vinh','Nha Trang'],
@@ -152,7 +172,6 @@ const BANK=[
  ['Cơ thể tổng hợp vitamin nào khi tắm nắng?','Vitamin D','Vitamin C','Vitamin A','Vitamin B12'],
  ['H2O là công thức của chất nào?','Nước','Muối ăn','Ôxy','Cồn'],
  ['Cá heo thuộc nhóm động vật nào?','Động vật có vú','Cá','Lưỡng cư','Bò sát'],
- ['Biểu tượng của TikTok có hình gì?','Nốt nhạc','Ngôi sao','Trái tim','Khung hình'],
  ['Phím tắt sao chép trên Windows là?','Ctrl + C','Ctrl + V','Ctrl + X','Ctrl + Z'],
  ['Hệ điều hành Android chủ yếu do công ty nào phát triển?','Google','Apple','Microsoft','Nokia'],
  ['Zalo là ứng dụng của công ty Việt Nam nào?','VNG','FPT','Viettel','VNPT'],
@@ -162,17 +181,11 @@ const BANK=[
  ['Một ván cờ vua mỗi bên có bao nhiêu quân?','16','12','20','32'],
  ['Nữ hoàng băng giá trong phim “Frozen” tên là gì?','Elsa','Anna','Moana','Belle'],
  ['Doraemon là nhân vật loại gì?','Mèo máy','Chó máy','Gấu bông','Khỉ máy'],
- ['12 × 12 bằng bao nhiêu?','144','124','122','154'],
- ['Một giờ có bao nhiêu giây?','3600','360','6000','1440'],
- ['Số nào sau đây là số nguyên tố?','13','15','21','27'],
- ['Căn bậc hai của 81 là?','9','8','7','11'],
- ['1 kg bằng bao nhiêu gram?','1000','100','10000','500'],
  ['Năm nhuận có bao nhiêu ngày?','366','365','364','367'],
- ['Tổng ba góc trong một tam giác là bao nhiêu độ?','180','90','360','270'],
  ['Trộn màu xanh dương với màu vàng được màu gì?','Xanh lá','Cam','Tím','Nâu'],
  ['Trong tiếng Anh, “apple” nghĩa là gì?','Quả táo','Quả cam','Quả chuối','Quả nho'],
  ['Mạng xã hội biểu tượng chim xanh trước khi đổi tên thành X là?','Twitter','Facebook','Instagram','Zalo']
-].map(a=>({q:a[0],c:a[1],w:a.slice(2)}));
+].map(a=>({q:a[0],c:a[1],w:a.slice(2),m:MQS.has(a[0])}));
 /* ===================== */
 let used=new Set();try{used=new Set(JSON.parse(localStorage.getItem('quizUsed')||'[]'))}catch(_){}
 const saveUsed=()=>{try{localStorage.setItem('quizUsed',JSON.stringify([...used]))}catch(_){}};
@@ -288,7 +301,8 @@ $('addm').onclick=async()=>{const ls=$('nm').value.split('\n').map(l=>l.trim()).
     if(!HOT.some(h=>norm(h[0])===norm(t)))HOT.push([t,a]);if(await webSong(t,a))k++}
   $('mc').textContent=k+'/'+ls.length+' bài tìm thấy trên web.'+(k<ls.length?' Bài không thấy: thử ghi đúng tên bài và ca sĩ, hoặc thêm file mp3.':'');if(k)$('nm').value=''};
 /* ---- Câu hỏi: hàng đợi (✍ bạn nhập > 🤖 AI > 📚 có sẵn); AI tự bổ sung để không hết/lặp ---- */
-let sample=null,aiAuto=true,aiWait=0,aiP=null;const PR={manual:0,ai:1,bank:2},TOPICS=['địa lý Việt Nam','lịch sử Việt Nam','ẩm thực & văn hóa','khoa học đời sống','động vật & thiên nhiên','thể thao','công nghệ & internet','phim, hoạt hình, âm nhạc','toán đố vui','văn học & thành ngữ','địa lý thế giới','cơ thể & sức khỏe','từ vựng tiếng Anh','vũ trụ','lễ hội & phong tục'];
+const isMath=q=>/\d\s*[×÷+−*]\s*\d|% của|căn bậc|số nguyên tố|phép (tính|cộng|trừ|nhân|chia)|bao nhiêu độ|toán/i.test(q);
+let sample=null,aiAuto=true,aiWait=0,aiP=null;const PR={manual:0,ai:1,bank:2},MTOPICS=['nhạc Việt Nam: ca sĩ, nhạc sĩ & bài hát nổi tiếng','nhạc quốc tế: ca sĩ, ban nhạc & bài hát nổi tiếng','nhạc cụ & kiến thức âm nhạc cơ bản','dân ca & nhạc truyền thống Việt Nam','nhạc trẻ, V-pop & thần tượng âm nhạc','nhạc sĩ & nhà soạn nhạc nổi tiếng thế giới'],TOPICS=['địa lý Việt Nam','lịch sử Việt Nam','ẩm thực & văn hóa','khoa học đời sống','động vật & thiên nhiên','thể thao','công nghệ & internet','phim, hoạt hình','văn học & thành ngữ','địa lý thế giới','cơ thể & sức khỏe','từ vựng tiếng Anh','vũ trụ','lễ hội & phong tục'];
 try{window.claude&&claude.use('sample').then(x=>{if(x){sample=x;$('aist').textContent='✓ AI sẵn sàng: tự viết thêm câu khi sắp hết.'}}).catch(()=>{})}catch(_){}
 const MODELS={groq:['llama-3.3-70b-versatile','openai/gpt-oss-120b','llama-3.1-8b-instant'],gemini:['gemini-flash-latest','gemini-2.5-flash','gemini-2.0-flash'],claude:['claude-sonnet-5-5','claude-haiku-5-5']};let memKey='';
 const isClaudeKey=k=>/^sk-ant-/i.test(k),isGroqKey=k=>/^gsk_/i.test(k);
@@ -313,34 +327,29 @@ setTimeout(()=>{if(sample)return;$('akey').hidden=false;if(!$('akey').value)$('a
 const nset=b=>new Set([...used,...queue.map(x=>x.q),...(b?BANK.map(x=>x.q):[])].map(norm)),dup=q=>nset(1).has(norm(q));
 const saveQ=()=>{try{localStorage.setItem('quizQ',JSON.stringify(queue.filter(x=>x.src!=='bank')))}catch(_){}};
 function enqueue(it){let i=queue.findIndex(y=>PR[y.src]>PR[it.src]);if(i<0)i=queue.length;queue.splice(i,0,it);saveQ();renderQ()}
-function fillBank(){const s=nset();shuffle(BANK).forEach(b=>{if(!s.has(norm(b.q)))enqueue({...b,src:'bank'})})}
+function fillBank(){const s=nset();[...shuffle(BANK.filter(b=>b.m)),...shuffle(BANK.filter(b=>!b.m))].forEach(b=>{if(!s.has(norm(b.q)))enqueue({...b,src:'bank'})})}
 function renderQ(){$('qn').textContent=queue.length;const b=$('ailist');b.textContent='';
   queue.slice(0,25).forEach(it=>{const r=document.createElement('div'),x=document.createElement('button'),t=document.createElement('span'),k=document.createElement('b');
     x.textContent='×';x.title='Xóa câu này';x.onclick=()=>{queue=queue.filter(y=>y!==it);saveQ();renderQ()};k.textContent=({manual:'✍',ai:'🤖',bank:'📚'})[it.src]||'';t.append(k,' '+it.q+' → '+it.c);r.append(x,t);b.append(r)});
   if(queue.length>25){const m=document.createElement('small');m.textContent='… và '+(queue.length-25)+' câu nữa';b.append(m)}}
 const genAI=f=>aiP||(sample&&(f||Date.now()>=aiWait)?(aiP=genRun().finally(()=>{aiP=null})):Promise.resolve());
 async function genRun(){$('aist').textContent='🤖 AI đang viết câu hỏi...';
-  const topic=$('aitopic').value.trim()||TOPICS[Math.random()*TOPICS.length|0],recent=[...used].slice(-80).concat(queue.map(x=>x.q),BANK.map(x=>x.q)).join(' | ');
-  const prompt='Bạn là biên tập viên quiz cho livestream TikTok Việt Nam. Viết 10 câu hỏi trắc nghiệm tiếng Việt, chủ đề: '+topic+'. Quy tắc: chỉ dùng kiến thức chắc chắn, không thay đổi theo thời gian, tránh câu gây tranh cãi; mỗi câu hỏi một ý riêng, không na ná nhau; câu hỏi tối đa 90 ký tự; mỗi đáp án tối đa 28 ký tự; đúng 1 đáp án đúng và 3 đáp án sai hợp lý; độ khó trộn lẫn; tuyệt đối không trùng ý với các câu sau: '+recent+'. Chỉ trả về JSON dạng [{"q":"...","c":"đáp án đúng","w":["sai 1","sai 2","sai 3"]}].';
+  const topic=$('aitopic').value.trim()||(Math.random()<.7?MTOPICS[Math.random()*MTOPICS.length|0]:TOPICS[Math.random()*TOPICS.length|0]),recent=[...used].slice(-80).concat(queue.map(x=>x.q),BANK.map(x=>x.q)).join(' | ');
+  const prompt='Bạn là biên tập viên quiz cho livestream TikTok Việt Nam. Viết 10 câu hỏi trắc nghiệm tiếng Việt, chủ đề: '+topic+'. Quy tắc: chỉ dùng kiến thức chắc chắn, không thay đổi theo thời gian, tránh câu gây tranh cãi; mỗi câu hỏi một ý riêng, không na ná nhau; câu hỏi tối đa 90 ký tự; mỗi đáp án tối đa 28 ký tự; đúng 1 đáp án đúng và 3 đáp án sai hợp lý; độ khó trộn lẫn; tuyệt đối không ra câu hỏi toán, tính toán hay con số; tuyệt đối không trùng ý với các câu sau: '+recent+'. Chỉ trả về JSON dạng [{"q":"...","c":"đáp án đúng","w":["sai 1","sai 2","sai 3"]}].';
   try{const arr=await sample.json(prompt,{cache:false}),s=nset(1);let k=0;
     (Array.isArray(arr)?arr:[]).forEach(x=>{if(!x||typeof x.q!=='string'||typeof x.c!=='string'||!Array.isArray(x.w))return;
       const q=x.q.trim(),c=x.c.trim(),w=[...new Set(x.w.map(v=>String(v).trim()))].filter(t=>t&&norm(t)!==norm(c)).slice(0,3);
-      if(w.length<3||!c||q.length<8||q.length>130||[c,...w].some(t=>t.length>40)||s.has(norm(q)))return;s.add(norm(q));enqueue({q,c,w,src:'ai'});k++});
+      if(w.length<3||!c||q.length<8||q.length>130||[c,...w].some(t=>t.length>40)||s.has(norm(q))||isMath(q))return;s.add(norm(q));enqueue({q,c,w,src:'ai'});k++});
     $('aist').textContent=k?'🤖 AI vừa thêm '+k+' câu ('+topic+').':'AI chưa tạo được câu hợp lệ, sẽ thử lại.';if(!k)aiWait=Date.now()+20000}
   catch(e){if(e&&e.code==='not_granted'){aiAuto=false;$('aiauto').textContent='Tự động bổ sung: tắt';$('aist').textContent='Bạn đã từ chối quyền cho AI.'}
     else{aiWait=Date.now()+(e&&e.code==='rate_limited'?60000:20000);$('aist').textContent=(e&&e.code==='bad_key'?'API key không đúng hoặc hết hạn mức. ':'Lỗi AI, sẽ thử lại sau. ')+(e&&e.message||e)}}}
 $('aigo').onclick=()=>{aiWait=0;genAI()};$('aiauto').onclick=()=>{aiAuto=!aiAuto;$('aiauto').textContent='Tự động bổ sung: '+(aiAuto?'bật':'tắt')};
-/* ---- Luồng game: mỗi câu chỉ xuất hiện 1 lần, hết ngân hàng thì sinh câu toán mới ---- */
+/* ---- Luồng game: mỗi câu chỉ xuất hiện 1 lần, hết ngân hàng thì phát lại ---- */
 const mk=(q,c,w)=>{const o=shuffle([c,...w]);return{q,o,a:o.indexOf(c)}};
-function proc(){for(let t=0;t<50;t++){let q,c,k=Math.random()*3|0;
-  if(k===0){const a=6+Math.random()*14|0,b=6+Math.random()*14|0;q=a+' × '+b+' = ?';c=a*b}
-  else if(k===1){const a=100+Math.random()*800|0,b=20+Math.random()*180|0,d=10+Math.random()*90|0;q=a+' + '+b+' − '+d+' = ?';c=a+b-d}
-  else{const p=[10,20,25,50][Math.random()*4|0],y=40*(2+Math.random()*24|0);q=p+'% của '+y+' là bao nhiêu?';c=p*y/100}
-  if(procSeen.has(q))continue;procSeen.add(q);const w=new Set();while(w.size<3){const x=c+(Math.random()<.5?-1:1)*(1+Math.random()*12|0);if(x!==c&&x>=0)w.add(x)}
-  return mk(q,String(c),[...w].map(String))}return mk('1 + 1 = ?','2',['1','3','4'])}
-function pick(){while(queue.length){const q=queue.shift();if(!used.has(q.q)){used.add(q.q);saveUsed();saveQ();renderQ();return mk(q.q,q.c,q.w)}}
+function proc(){const b=BANK[Math.random()*BANK.length|0];return mk(b.q,b.c,b.w)}
+function pick(){while(queue.length){const q=queue.shift();if(!used.has(q.q)&&!isMath(q.q)){used.add(q.q);saveUsed();saveQ();renderQ();return mk(q.q,q.c,q.w)}}
   BANK.forEach(b=>used.delete(b.q));saveUsed();fillBank();if(queue.length){notify('first','📚 Hết câu mới, phát lại câu trong ngân hàng');return pick()}
-  if(!procMsg){procMsg=true;notify('first','📚 Hết câu, chuyển sang câu toán ngẫu nhiên')}return proc()}
+  return proc()}
 async function nextQ(){const my=++qseq;if(aiAuto&&queue.filter(x=>x.src==='ai').length<8)genAI();if(aiAuto&&sample&&!queue.length&&n%CFG.musicEvery!==CFG.musicEvery-1){$('info').textContent='🤖 AI đang viết câu hỏi mới...';for(let t=0;t<3&&!queue.length;t++){await Promise.race([genAI(true),sleep(25000)]);if(my!==qseq)return;if(!queue.length)await sleep(1500)}}cancelAll();clearInterval(timer);n++;cur=(n%CFG.musicEvery===0&&pickMusic())||pick();phase='intro';answers=new Map();first=false;mult=pendMult;pendMult=1;total=left=CFG.seconds;
   drawQ();$('fill').style.width='100%';$('fill').classList.remove('low');$('time').textContent='🔊';$('info').textContent='Đang đọc câu hỏi...';
   if(cur.music)bgmStop();else bgmStart();
