@@ -289,12 +289,22 @@ $('addm').onclick=async()=>{const ls=$('nm').value.split('\n').map(l=>l.trim()).
 /* ---- Câu hỏi: hàng đợi (✍ bạn nhập > 🤖 AI > 📚 có sẵn); AI tự bổ sung để không hết/lặp ---- */
 let sample=null,aiAuto=true,aiWait=0,aiP=null;const PR={manual:0,ai:1,bank:2},TOPICS=['địa lý Việt Nam','lịch sử Việt Nam','ẩm thực & văn hóa','khoa học đời sống','động vật & thiên nhiên','thể thao','công nghệ & internet','phim, hoạt hình, âm nhạc','toán đố vui','văn học & thành ngữ','địa lý thế giới','cơ thể & sức khỏe','từ vựng tiếng Anh','vũ trụ','lễ hội & phong tục'];
 try{window.claude&&claude.use('sample').then(x=>{if(x){sample=x;$('aist').textContent='✓ AI sẵn sàng: tự viết thêm câu khi sắp hết.'}}).catch(()=>{})}catch(_){}
-const KEY=()=>{try{return localStorage.getItem('quizKey')||''}catch(_){return ''}};
-function useKey(){sample=KEY()?{json:async p=>{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':KEY(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5-5',max_tokens:4000,messages:[{role:'user',content:p}]})});
-  if(!r.ok){const e=new Error('http '+r.status);e.code=r.status===429?'rate_limited':(r.status===401||r.status===403)?'bad_key':'err';throw e}
-  const t=(await r.json()).content.map(c=>c.text||'').join('');return JSON.parse(t.slice(t.indexOf('['),t.lastIndexOf(']')+1))}}:null;
-  $('aist').textContent=sample?'✓ AI sẵn sàng (dùng API key của bạn).':'Dán API key vào ô trên để bật AI.'}
-setTimeout(()=>{if(sample)return;$('akey').hidden=false;$('akey').value=KEY();useKey()},1500);$('akey').onchange=()=>{try{localStorage.setItem('quizKey',$('akey').value.trim())}catch(_){}useKey()};
+const MODELS=['claude-sonnet-5-5','claude-haiku-5-5'];let memKey='';
+function useKey(){const k=KEY();
+  if(!k){if(sample&&sample.byKey)sample=null;$('aist').textContent=sample?'✓ AI sẵn sàng.':'Dán API key vào ô trên để bật AI.';return}
+  sample={byKey:true,json:async p=>{let last;for(const m of MODELS){let r;
+    try{r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':KEY(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:m,max_tokens:4000,messages:[{role:'user',content:p}]})})}
+    catch(x){const e=new Error('Không kết nối được tới api.anthropic.com ('+(x&&x.message||x)+')');e.code='net';throw e}
+    if(!r.ok){let msg='';try{msg=(await r.json()).error.message}catch(_){}const e=new Error('HTTP '+r.status+(msg?': '+msg:''));
+      e.code=r.status===429?'rate_limited':(r.status===401||r.status===403)?'bad_key':'err';
+      if(r.status===404||(r.status===400&&/model/i.test(msg))){last=e;continue}throw e}
+    const t=(await r.json()).content.map(c=>c.text||'').join(''),a=t.indexOf('['),b=t.lastIndexOf(']');
+    if(a<0||b<a)throw new Error('AI không trả về JSON hợp lệ');return JSON.parse(t.slice(a,b+1))}
+    throw last||new Error('Không có model khả dụng')}};
+  $('aist').textContent='✓ AI sẵn sàng (dùng API key của bạn).'}
+const KEY=()=>memKey||(()=>{try{return localStorage.getItem('quizKey')||''}catch(_){return ''}})();
+const setKey=()=>{memKey=$('akey').value.trim();try{localStorage.setItem('quizKey',memKey)}catch(_){}aiWait=0;useKey()};
+setTimeout(()=>{if(sample)return;$('akey').hidden=false;if(!$('akey').value)$('akey').value=KEY();memKey=$('akey').value.trim();useKey()},1500);$('akey').onchange=setKey;$('akey').oninput=setKey;
 const nset=b=>new Set([...used,...queue.map(x=>x.q),...(b?BANK.map(x=>x.q):[])].map(norm)),dup=q=>nset(1).has(norm(q));
 const saveQ=()=>{try{localStorage.setItem('quizQ',JSON.stringify(queue.filter(x=>x.src!=='bank')))}catch(_){}};
 function enqueue(it){let i=queue.findIndex(y=>PR[y.src]>PR[it.src]);if(i<0)i=queue.length;queue.splice(i,0,it);saveQ();renderQ()}
@@ -303,7 +313,7 @@ function renderQ(){$('qn').textContent=queue.length;const b=$('ailist');b.textCo
   queue.slice(0,25).forEach(it=>{const r=document.createElement('div'),x=document.createElement('button'),t=document.createElement('span'),k=document.createElement('b');
     x.textContent='×';x.title='Xóa câu này';x.onclick=()=>{queue=queue.filter(y=>y!==it);saveQ();renderQ()};k.textContent=({manual:'✍',ai:'🤖',bank:'📚'})[it.src]||'';t.append(k,' '+it.q+' → '+it.c);r.append(x,t);b.append(r)});
   if(queue.length>25){const m=document.createElement('small');m.textContent='… và '+(queue.length-25)+' câu nữa';b.append(m)}}
-const genAI=()=>aiP||(sample&&Date.now()>=aiWait?(aiP=genRun().finally(()=>{aiP=null})):Promise.resolve());
+const genAI=f=>aiP||(sample&&(f||Date.now()>=aiWait)?(aiP=genRun().finally(()=>{aiP=null})):Promise.resolve());
 async function genRun(){$('aist').textContent='🤖 AI đang viết câu hỏi...';
   const topic=$('aitopic').value.trim()||TOPICS[Math.random()*TOPICS.length|0],recent=[...used].slice(-80).concat(queue.map(x=>x.q),BANK.map(x=>x.q)).join(' | ');
   const prompt='Bạn là biên tập viên quiz cho livestream TikTok Việt Nam. Viết 10 câu hỏi trắc nghiệm tiếng Việt, chủ đề: '+topic+'. Quy tắc: chỉ dùng kiến thức chắc chắn, không thay đổi theo thời gian, tránh câu gây tranh cãi; mỗi câu hỏi một ý riêng, không na ná nhau; câu hỏi tối đa 90 ký tự; mỗi đáp án tối đa 28 ký tự; đúng 1 đáp án đúng và 3 đáp án sai hợp lý; độ khó trộn lẫn; tuyệt đối không trùng ý với các câu sau: '+recent+'. Chỉ trả về JSON dạng [{"q":"...","c":"đáp án đúng","w":["sai 1","sai 2","sai 3"]}].';
@@ -313,7 +323,7 @@ async function genRun(){$('aist').textContent='🤖 AI đang viết câu hỏi..
       if(w.length<3||!c||q.length<8||q.length>130||[c,...w].some(t=>t.length>40)||s.has(norm(q)))return;s.add(norm(q));enqueue({q,c,w,src:'ai'});k++});
     $('aist').textContent=k?'🤖 AI vừa thêm '+k+' câu ('+topic+').':'AI chưa tạo được câu hợp lệ, sẽ thử lại.';if(!k)aiWait=Date.now()+20000}
   catch(e){if(e&&e.code==='not_granted'){aiAuto=false;$('aiauto').textContent='Tự động bổ sung: tắt';$('aist').textContent='Bạn đã từ chối quyền cho AI.'}
-    else{aiWait=Date.now()+(e&&e.code==='rate_limited'?60000:20000);$('aist').textContent=e&&e.code==='bad_key'?'API key không đúng hoặc hết hạn mức.':'AI đang bận, sẽ thử lại sau.'}}}
+    else{aiWait=Date.now()+(e&&e.code==='rate_limited'?60000:20000);$('aist').textContent=(e&&e.code==='bad_key'?'API key không đúng hoặc hết hạn mức. ':'Lỗi AI, sẽ thử lại sau. ')+(e&&e.message||e)}}}
 $('aigo').onclick=()=>{aiWait=0;genAI()};$('aiauto').onclick=()=>{aiAuto=!aiAuto;$('aiauto').textContent='Tự động bổ sung: '+(aiAuto?'bật':'tắt')};
 /* ---- Luồng game: mỗi câu chỉ xuất hiện 1 lần, hết ngân hàng thì sinh câu toán mới ---- */
 const mk=(q,c,w)=>{const o=shuffle([c,...w]);return{q,o,a:o.indexOf(c)}};
@@ -324,8 +334,9 @@ function proc(){for(let t=0;t<50;t++){let q,c,k=Math.random()*3|0;
   if(procSeen.has(q))continue;procSeen.add(q);const w=new Set();while(w.size<3){const x=c+(Math.random()<.5?-1:1)*(1+Math.random()*12|0);if(x!==c&&x>=0)w.add(x)}
   return mk(q,String(c),[...w].map(String))}return mk('1 + 1 = ?','2',['1','3','4'])}
 function pick(){while(queue.length){const q=queue.shift();if(!used.has(q.q)){used.add(q.q);saveUsed();saveQ();renderQ();return mk(q.q,q.c,q.w)}}
-  if(!procMsg){procMsg=true;notify('first','📚 Hết câu trong ngân hàng, chuyển sang câu toán ngẫu nhiên')}return proc()}
-async function nextQ(){const my=++qseq;if(aiAuto&&queue.filter(x=>x.src==='ai').length<8)genAI();if(sample&&!queue.length&&n%CFG.musicEvery!==CFG.musicEvery-1){$('info').textContent='🤖 AI đang viết câu hỏi mới...';await Promise.race([genAI(),sleep(15000)]);if(my!==qseq)return}cancelAll();clearInterval(timer);n++;cur=(n%CFG.musicEvery===0&&pickMusic())||pick();phase='intro';answers=new Map();first=false;mult=pendMult;pendMult=1;total=left=CFG.seconds;
+  BANK.forEach(b=>used.delete(b.q));saveUsed();fillBank();if(queue.length){notify('first','📚 Hết câu mới, phát lại câu trong ngân hàng');return pick()}
+  if(!procMsg){procMsg=true;notify('first','📚 Hết câu, chuyển sang câu toán ngẫu nhiên')}return proc()}
+async function nextQ(){const my=++qseq;if(aiAuto&&queue.filter(x=>x.src==='ai').length<8)genAI();if(aiAuto&&sample&&!queue.length&&n%CFG.musicEvery!==CFG.musicEvery-1){$('info').textContent='🤖 AI đang viết câu hỏi mới...';for(let t=0;t<3&&!queue.length;t++){await Promise.race([genAI(true),sleep(25000)]);if(my!==qseq)return;if(!queue.length)await sleep(1500)}}cancelAll();clearInterval(timer);n++;cur=(n%CFG.musicEvery===0&&pickMusic())||pick();phase='intro';answers=new Map();first=false;mult=pendMult;pendMult=1;total=left=CFG.seconds;
   drawQ();$('fill').style.width='100%';$('fill').classList.remove('low');$('time').textContent='🔊';$('info').textContent='Đang đọc câu hỏi...';
   if(cur.music)bgmStop();else bgmStart();
   await speak(cur.music?'Quiz âm nhạc! Hãy lắng nghe và đoán tên bài hát.':'Câu số '+n+'. '+cur.q);if(my!==qseq)return;
