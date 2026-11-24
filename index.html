@@ -89,7 +89,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
   <b>Bảng điều khiển</b> <small>(ấn H để ẩn khi live)</small>
   <h4>Câu hỏi</h4>
   <div class="tabs"><button class="on" data-t="ai">🤖 AI tạo</button><button data-t="hand">✍ Tự nhập</button><button data-t="bulk">📋 Dán nhiều</button></div>
-  <div id="t-ai"><input id="aitopic" placeholder="Chủ đề (trống = AI tự đổi chủ đề)"><div class="g"><button id="aigo">Tạo thêm 10 câu</button><button id="aiauto">Tự động bổ sung: bật</button></div></div>
+  <div id="t-ai"><input id="akey" type="password" placeholder="Dán Anthropic API key (sk-ant-...)" hidden><input id="aitopic" placeholder="Chủ đề (trống = AI tự đổi chủ đề)"><div class="g"><button id="aigo">Tạo thêm 10 câu</button><button id="aiauto">Tự động bổ sung: bật</button></div></div>
   <div id="t-hand" hidden><input id="fq" placeholder="Gõ câu hỏi..."><div id="fans"></div><button id="fadd">+ Thêm câu này</button><small> Chọn nút tròn ở đáp án đúng · Enter để thêm</small></div>
   <div id="t-bulk" hidden><textarea id="nq" rows="4" placeholder="Mỗi dòng: Câu hỏi | A | B | C | D | đáp án đúng (A-D)"></textarea><button id="addq">Thêm tất cả</button></div>
   <small id="aist" style="display:block;margin-top:6px">Chưa có AI ở bản này (cần mở bản trên Claude). Vẫn tự nhập được.</small>
@@ -289,6 +289,12 @@ $('addm').onclick=async()=>{const ls=$('nm').value.split('\n').map(l=>l.trim()).
 /* ---- Câu hỏi: hàng đợi (✍ bạn nhập > 🤖 AI > 📚 có sẵn); AI tự bổ sung để không hết/lặp ---- */
 let sample=null,aiAuto=true,aiWait=0,aiP=null;const PR={manual:0,ai:1,bank:2},TOPICS=['địa lý Việt Nam','lịch sử Việt Nam','ẩm thực & văn hóa','khoa học đời sống','động vật & thiên nhiên','thể thao','công nghệ & internet','phim, hoạt hình, âm nhạc','toán đố vui','văn học & thành ngữ','địa lý thế giới','cơ thể & sức khỏe','từ vựng tiếng Anh','vũ trụ','lễ hội & phong tục'];
 try{window.claude&&claude.use('sample').then(x=>{if(x){sample=x;$('aist').textContent='✓ AI sẵn sàng: tự viết thêm câu khi sắp hết.'}}).catch(()=>{})}catch(_){}
+const KEY=()=>{try{return localStorage.getItem('quizKey')||''}catch(_){return ''}};
+function useKey(){sample=KEY()?{json:async p=>{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':KEY(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-5-5',max_tokens:4000,messages:[{role:'user',content:p}]})});
+  if(!r.ok){const e=new Error('http '+r.status);e.code=r.status===429?'rate_limited':(r.status===401||r.status===403)?'bad_key':'err';throw e}
+  const t=(await r.json()).content.map(c=>c.text||'').join('');return JSON.parse(t.slice(t.indexOf('['),t.lastIndexOf(']')+1))}}:null;
+  $('aist').textContent=sample?'✓ AI sẵn sàng (dùng API key của bạn).':'Dán API key vào ô trên để bật AI.'}
+setTimeout(()=>{if(sample)return;$('akey').hidden=false;$('akey').value=KEY();useKey()},1500);$('akey').onchange=()=>{try{localStorage.setItem('quizKey',$('akey').value.trim())}catch(_){}useKey()};
 const nset=b=>new Set([...used,...queue.map(x=>x.q),...(b?BANK.map(x=>x.q):[])].map(norm)),dup=q=>nset(1).has(norm(q));
 const saveQ=()=>{try{localStorage.setItem('quizQ',JSON.stringify(queue.filter(x=>x.src!=='bank')))}catch(_){}};
 function enqueue(it){let i=queue.findIndex(y=>PR[y.src]>PR[it.src]);if(i<0)i=queue.length;queue.splice(i,0,it);saveQ();renderQ()}
@@ -307,7 +313,7 @@ async function genRun(){$('aist').textContent='🤖 AI đang viết câu hỏi..
       if(w.length<3||!c||q.length<8||q.length>130||[c,...w].some(t=>t.length>40)||s.has(norm(q)))return;s.add(norm(q));enqueue({q,c,w,src:'ai'});k++});
     $('aist').textContent=k?'🤖 AI vừa thêm '+k+' câu ('+topic+').':'AI chưa tạo được câu hợp lệ, sẽ thử lại.';if(!k)aiWait=Date.now()+20000}
   catch(e){if(e&&e.code==='not_granted'){aiAuto=false;$('aiauto').textContent='Tự động bổ sung: tắt';$('aist').textContent='Bạn đã từ chối quyền cho AI.'}
-    else{aiWait=Date.now()+(e&&e.code==='rate_limited'?60000:20000);$('aist').textContent='AI đang bận, sẽ thử lại sau.'}}}
+    else{aiWait=Date.now()+(e&&e.code==='rate_limited'?60000:20000);$('aist').textContent=e&&e.code==='bad_key'?'API key không đúng hoặc hết hạn mức.':'AI đang bận, sẽ thử lại sau.'}}}
 $('aigo').onclick=()=>{aiWait=0;genAI()};$('aiauto').onclick=()=>{aiAuto=!aiAuto;$('aiauto').textContent='Tự động bổ sung: '+(aiAuto?'bật':'tắt')};
 /* ---- Luồng game: mỗi câu chỉ xuất hiện 1 lần, hết ngân hàng thì sinh câu toán mới ---- */
 const mk=(q,c,w)=>{const o=shuffle([c,...w]);return{q,o,a:o.indexOf(c)}};
