@@ -209,7 +209,8 @@ const HOT=[['xương rồng','Dangrangto'],['để dành cho em','Dangrangto'],[
 const norm=t=>String(t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 function parseSong(name,url){const base=name.replace(/\.[^.]+$/,'').replace(/_+/g,' ').trim(),i=base.indexOf(' - ');let title=i>0?base.slice(0,i).trim():base,artist=i>0?base.slice(i+3).trim():'';
   const h=HOT.find(x=>norm(x[0])===norm(title));if(h){title=h[0];if(!artist)artist=h[1]}return{title,artist,url}}
-function pickMusic(){const src=MUSIC.filter(x=>x.url&&!usedM.has(norm(x.title)));
+function pickMusic(){let src=MUSIC.filter(x=>x.url&&!usedM.has(norm(x.title)));
+  if(!src.length&&MUSIC.some(x=>x.url)){usedM=new Set();saveUsedM();src=MUSIC.filter(x=>x.url);notify('first','🎵 Đã phát hết bài, bắt đầu lại từ đầu')}
   if(!src.length){if(!musicMsg){musicMsg=true;notify('first','🎵 Chưa có bài mới để phát, bỏ qua câu nhạc')}return null}
   const m=shuffle(src)[0];usedM.add(norm(m.title));saveUsedM();const seen=new Set([norm(m.title)]),pool=[];
   [...MUSIC.map(x=>x.title),...HOT.map(x=>x[0]),...DECOYS].forEach(t=>{const k=norm(t);if(!seen.has(k)&&!usedM.has(k)){seen.add(k);pool.push(t)}});
