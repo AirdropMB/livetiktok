@@ -69,6 +69,9 @@ body.hide #sim{display:none}
 @media(max-width:700px){#sim{display:none}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition:none!important}}
 button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--gold)}
+#sim{width:360px}#sim input,#sim textarea{background:#241a5a;color:var(--ink)}
+.tabs{display:flex;gap:4px;margin-bottom:8px}.tabs button{flex:1;padding:7px 4px}.tabs button.on{background:var(--gold);color:var(--bg)}
+.a{display:flex;gap:6px;align-items:center;margin-bottom:6px}.a input[type=text]{margin:0!important}.a input[type=radio]{width:auto!important;margin:0!important;accent-color:#3ddc97}.a b{width:16px;color:var(--dim)}
 </style></head><body>
 <div id="stage">
   <div id="top"><span id="cnt">Câu 0</span><div id="bar"><div id="fill"></div></div><span id="time">--</span></div>
@@ -84,6 +87,13 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 </div>
 <aside id="sim">
   <b>Bảng điều khiển</b> <small>(ấn H để ẩn khi live)</small>
+  <h4>Câu hỏi</h4>
+  <div class="tabs"><button class="on" data-t="ai">🤖 AI tạo</button><button data-t="hand">✍ Tự nhập</button><button data-t="bulk">📋 Dán nhiều</button></div>
+  <div id="t-ai"><input id="aitopic" placeholder="Chủ đề (trống = AI tự đổi chủ đề)"><div class="g"><button id="aigo">Tạo thêm 10 câu</button><button id="aiauto">Tự động bổ sung: bật</button></div></div>
+  <div id="t-hand" hidden><input id="fq" placeholder="Gõ câu hỏi..."><div id="fans"></div><button id="fadd">+ Thêm câu này</button><small> Chọn nút tròn ở đáp án đúng · Enter để thêm</small></div>
+  <div id="t-bulk" hidden><textarea id="nq" rows="4" placeholder="Mỗi dòng: Câu hỏi | A | B | C | D | đáp án đúng (A-D)"></textarea><button id="addq">Thêm tất cả</button></div>
+  <small id="aist" style="display:block;margin-top:6px">Chưa có AI ở bản này (cần mở bản trên Claude). Vẫn tự nhập được.</small>
+  <h4>Sắp phát: <span id="qn">0</span> câu <small>(✍ bạn → 🤖 AI → 📚 có sẵn)</small></h4><div id="ailist"></div>
   <h4>Điều khiển</h4>
   <div class="g"><button id="skip">Bỏ qua câu</button><button id="reset">Đặt lại điểm</button><button id="mute">Tắt/bật âm</button><button id="forget">Quên câu đã dùng</button><button id="vmute">Tắt/bật giọng đọc</button><button id="bmute">Tắt/bật nhạc nền</button><button id="tmusic">Thử quiz âm nhạc</button></div>
   <h4>Giả lập người xem</h4>
@@ -92,13 +102,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
   <h4>Giả lập quà</h4>
   <div class="g"><button data-g="Rose:1">Rose (1)</button><button data-g="Finger Heart:5">Finger Heart (5)</button><button data-g="Doughnut:30">Doughnut (30)</button><button data-g="Hand Hearts:100">Hand Hearts (100)</button><button data-g="Galaxy:1000">Galaxy (1000)</button></div>
   <h4>Người chơi ảo</h4><button id="bots">Bật/tắt 15 bot</button>
-  <div id="aibox" hidden><h4>AI viết câu hỏi</h4><input id="aitopic" placeholder="Chủ đề (để trống = tổng hợp)">
-  <div class="g"><button id="aigo">AI tạo 10 câu mới</button><button id="aiauto">Tự động bổ sung: bật</button></div><small id="aist">Sẵn sàng. Câu AI viết hiện ở dưới, bấm × để xóa câu bạn không ưng.</small><div id="ailist"></div></div>
   <h4>Âm nhạc</h4><label>Nhạc nền riêng (tùy chọn)<input type="file" accept="audio/*" id="bgf"></label><label>Thêm bài cho quiz nhạc (tên file = tên bài)<input type="file" accept="audio/*" multiple id="mf"></label><label>Thêm bài hot mới từ web (mỗi dòng: Tên bài - Ca sĩ)<textarea id="nm" rows="3" placeholder="Bắc Bling - Hòa Minzy"></textarea></label><button id="addm">Tìm &amp; thêm nhạc từ web</button>
   <small id="mc">Đang tải nhạc hot Việt Nam từ web...</small><details><summary>Tên file gợi ý (bài hot)</summary><small id="hl"></small></details>
-  <h4>Thêm câu hỏi</h4>
-  <textarea id="nq" rows="4" placeholder="Mỗi dòng: Câu hỏi | A | B | C | D | đáp án đúng (A-D)"></textarea>
-  <button id="addq">Thêm vào ngân hàng</button> <small id="qc"></small>
+  
   <h4>Kết nối TikTok</h4><button id="conn">Kết nối TikFinity</button>
   <pre id="evlog" style="white-space:pre-wrap;word-break:break-all;font-size:11px;color:var(--dim);margin-top:6px"></pre><div id="st">Chưa kết nối (đang dùng giả lập)</div>
 </aside>
@@ -280,25 +286,29 @@ $('addm').onclick=async()=>{const ls=$('nm').value.split('\n').map(l=>l.trim()).
   for(const l of ls){const i=l.indexOf(' - '),t=i>0?l.slice(0,i).trim():l,a=i>0?l.slice(i+3).trim():'';
     if(!HOT.some(h=>norm(h[0])===norm(t)))HOT.push([t,a]);if(await webSong(t,a))k++}
   $('mc').textContent=k+'/'+ls.length+' bài tìm thấy trên web.'+(k<ls.length?' Bài không thấy: thử ghi đúng tên bài và ca sĩ, hoặc thêm file mp3.':'');if(k)$('nm').value=''};
-/* ---- AI viết câu hỏi (Claude, qua nền tảng) ---- */
-let sample=null,aiBusy=false,aiAuto=true,aiWait=0;
-try{window.claude&&claude.use('sample').then(x=>{if(x){sample=x;$('aibox').hidden=false}}).catch(()=>{})}catch(_){}
-async function genAI(){if(!sample||aiBusy||Date.now()<aiWait)return;aiBusy=true;$('aist').textContent='AI đang viết câu hỏi...';
-  const topic=$('aitopic').value.trim()||'tổng hợp (đời sống, Việt Nam, thế giới, khoa học, công nghệ, thể thao, giải trí)';
-  const recent=[...used,...BANK.map(b=>b.q)].slice(-60).join(' | ');
-  const prompt='Bạn là biên tập viên quiz cho livestream TikTok Việt Nam. Viết 10 câu hỏi trắc nghiệm tiếng Việt, chủ đề: '+topic+'. Quy tắc: chỉ dùng kiến thức chắc chắn, không thay đổi theo thời gian, tránh câu gây tranh cãi; câu hỏi tối đa 90 ký tự; mỗi đáp án tối đa 28 ký tự; đúng 1 đáp án đúng và 3 đáp án sai hợp lý; độ khó trộn lẫn; không trùng với các câu sau: '+recent+'. Chỉ trả về JSON dạng [{"q":"...","c":"đáp án đúng","w":["sai 1","sai 2","sai 3"]}].';
-  try{const arr=await sample.json(prompt,{cache:false});let k=0;
-    (Array.isArray(arr)?arr:[]).forEach(x=>{if(!x||typeof x.q!=='string'||typeof x.c!=='string'||!Array.isArray(x.w))return;const w=[...new Set(x.w.map(String))].filter(t=>norm(t)!==norm(x.c)).slice(0,3);
-      const q=x.q.trim();if(w.length<3||q.length>130||q.length<8||[q,x.c,...w].some(t=>!t.trim()||t.length>40)||used.has(q)||queue.some(y=>y.q===q)||BANK.some(y=>y.q===q))return;
-      const it={q,c:x.c.trim(),w:w.map(t=>t.trim())};queue.push(it);k++;addAiRow(it)});
-    $('aist').textContent=k?'AI đã thêm '+k+' câu mới vào hàng đợi.':'AI chưa tạo được câu hợp lệ, thử lại sau.'}
+/* ---- Câu hỏi: hàng đợi (✍ bạn nhập > 🤖 AI > 📚 có sẵn); AI tự bổ sung để không hết/lặp ---- */
+let sample=null,aiAuto=true,aiWait=0,aiP=null;const PR={manual:0,ai:1,bank:2},TOPICS=['địa lý Việt Nam','lịch sử Việt Nam','ẩm thực & văn hóa','khoa học đời sống','động vật & thiên nhiên','thể thao','công nghệ & internet','phim, hoạt hình, âm nhạc','toán đố vui','văn học & thành ngữ','địa lý thế giới','cơ thể & sức khỏe','từ vựng tiếng Anh','vũ trụ','lễ hội & phong tục'];
+try{window.claude&&claude.use('sample').then(x=>{if(x){sample=x;$('aist').textContent='✓ AI sẵn sàng: tự viết thêm câu khi sắp hết.'}}).catch(()=>{})}catch(_){}
+const nset=b=>new Set([...used,...queue.map(x=>x.q),...(b?BANK.map(x=>x.q):[])].map(norm)),dup=q=>nset(1).has(norm(q));
+const saveQ=()=>{try{localStorage.setItem('quizQ',JSON.stringify(queue.filter(x=>x.src!=='bank')))}catch(_){}};
+function enqueue(it){let i=queue.findIndex(y=>PR[y.src]>PR[it.src]);if(i<0)i=queue.length;queue.splice(i,0,it);saveQ();renderQ()}
+function fillBank(){const s=nset();shuffle(BANK).forEach(b=>{if(!s.has(norm(b.q)))enqueue({...b,src:'bank'})})}
+function renderQ(){$('qn').textContent=queue.length;const b=$('ailist');b.textContent='';
+  queue.slice(0,25).forEach(it=>{const r=document.createElement('div'),x=document.createElement('button'),t=document.createElement('span'),k=document.createElement('b');
+    x.textContent='×';x.title='Xóa câu này';x.onclick=()=>{queue=queue.filter(y=>y!==it);saveQ();renderQ()};k.textContent=({manual:'✍',ai:'🤖',bank:'📚'})[it.src]||'';t.append(k,' '+it.q+' → '+it.c);r.append(x,t);b.append(r)});
+  if(queue.length>25){const m=document.createElement('small');m.textContent='… và '+(queue.length-25)+' câu nữa';b.append(m)}}
+const genAI=()=>aiP||(sample&&Date.now()>=aiWait?(aiP=genRun().finally(()=>{aiP=null})):Promise.resolve());
+async function genRun(){$('aist').textContent='🤖 AI đang viết câu hỏi...';
+  const topic=$('aitopic').value.trim()||TOPICS[Math.random()*TOPICS.length|0],recent=[...used].slice(-80).concat(queue.map(x=>x.q),BANK.map(x=>x.q)).join(' | ');
+  const prompt='Bạn là biên tập viên quiz cho livestream TikTok Việt Nam. Viết 10 câu hỏi trắc nghiệm tiếng Việt, chủ đề: '+topic+'. Quy tắc: chỉ dùng kiến thức chắc chắn, không thay đổi theo thời gian, tránh câu gây tranh cãi; mỗi câu hỏi một ý riêng, không na ná nhau; câu hỏi tối đa 90 ký tự; mỗi đáp án tối đa 28 ký tự; đúng 1 đáp án đúng và 3 đáp án sai hợp lý; độ khó trộn lẫn; tuyệt đối không trùng ý với các câu sau: '+recent+'. Chỉ trả về JSON dạng [{"q":"...","c":"đáp án đúng","w":["sai 1","sai 2","sai 3"]}].';
+  try{const arr=await sample.json(prompt,{cache:false}),s=nset(1);let k=0;
+    (Array.isArray(arr)?arr:[]).forEach(x=>{if(!x||typeof x.q!=='string'||typeof x.c!=='string'||!Array.isArray(x.w))return;
+      const q=x.q.trim(),c=x.c.trim(),w=[...new Set(x.w.map(v=>String(v).trim()))].filter(t=>t&&norm(t)!==norm(c)).slice(0,3);
+      if(w.length<3||!c||q.length<8||q.length>130||[c,...w].some(t=>t.length>40)||s.has(norm(q)))return;s.add(norm(q));enqueue({q,c,w,src:'ai'});k++});
+    $('aist').textContent=k?'🤖 AI vừa thêm '+k+' câu ('+topic+').':'AI chưa tạo được câu hợp lệ, sẽ thử lại.';if(!k)aiWait=Date.now()+20000}
   catch(e){if(e&&e.code==='not_granted'){aiAuto=false;$('aiauto').textContent='Tự động bổ sung: tắt';$('aist').textContent='Bạn đã từ chối quyền cho AI.'}
-    else{aiWait=Date.now()+(e&&e.code==='rate_limited'?60000:20000);$('aist').textContent='AI đang bận, sẽ thử lại sau.'}}
-  aiBusy=false}
-function addAiRow(it){const r=document.createElement('div'),x=document.createElement('button'),t=document.createElement('span');x.textContent='×';x.title='Xóa câu này';
-  t.append(document.createTextNode(it.q+' → '));const b=document.createElement('b');b.textContent=it.c;t.append(b);
-  x.onclick=()=>{queue=queue.filter(y=>y!==it);r.remove()};r.append(x,t);$('ailist').prepend(r);while($('ailist').children.length>12)$('ailist').lastChild.remove()}
-$('aigo').onclick=genAI;$('aiauto').onclick=()=>{aiAuto=!aiAuto;$('aiauto').textContent='Tự động bổ sung: '+(aiAuto?'bật':'tắt')};
+    else{aiWait=Date.now()+(e&&e.code==='rate_limited'?60000:20000);$('aist').textContent='AI đang bận, sẽ thử lại sau.'}}}
+$('aigo').onclick=()=>{aiWait=0;genAI()};$('aiauto').onclick=()=>{aiAuto=!aiAuto;$('aiauto').textContent='Tự động bổ sung: '+(aiAuto?'bật':'tắt')};
 /* ---- Luồng game: mỗi câu chỉ xuất hiện 1 lần, hết ngân hàng thì sinh câu toán mới ---- */
 const mk=(q,c,w)=>{const o=shuffle([c,...w]);return{q,o,a:o.indexOf(c)}};
 function proc(){for(let t=0;t<50;t++){let q,c,k=Math.random()*3|0;
@@ -307,9 +317,9 @@ function proc(){for(let t=0;t<50;t++){let q,c,k=Math.random()*3|0;
   else{const p=[10,20,25,50][Math.random()*4|0],y=40*(2+Math.random()*24|0);q=p+'% của '+y+' là bao nhiêu?';c=p*y/100}
   if(procSeen.has(q))continue;procSeen.add(q);const w=new Set();while(w.size<3){const x=c+(Math.random()<.5?-1:1)*(1+Math.random()*12|0);if(x!==c&&x>=0)w.add(x)}
   return mk(q,String(c),[...w].map(String))}return mk('1 + 1 = ?','2',['1','3','4'])}
-function pick(){while(queue.length){const q=queue.pop();if(!used.has(q.q)){used.add(q.q);saveUsed();return mk(q.q,q.c,q.w)}}
+function pick(){while(queue.length){const q=queue.shift();if(!used.has(q.q)){used.add(q.q);saveUsed();saveQ();renderQ();return mk(q.q,q.c,q.w)}}
   if(!procMsg){procMsg=true;notify('first','📚 Hết câu trong ngân hàng, chuyển sang câu toán ngẫu nhiên')}return proc()}
-async function nextQ(){const my=++qseq;if(aiAuto&&queue.length<=3)genAI();cancelAll();clearInterval(timer);n++;cur=(n%CFG.musicEvery===0&&pickMusic())||pick();phase='intro';answers=new Map();first=false;mult=pendMult;pendMult=1;total=left=CFG.seconds;
+async function nextQ(){const my=++qseq;if(aiAuto&&queue.filter(x=>x.src==='ai').length<8)genAI();if(sample&&!queue.length&&n%CFG.musicEvery!==CFG.musicEvery-1){$('info').textContent='🤖 AI đang viết câu hỏi mới...';await Promise.race([genAI(),sleep(15000)]);if(my!==qseq)return}cancelAll();clearInterval(timer);n++;cur=(n%CFG.musicEvery===0&&pickMusic())||pick();phase='intro';answers=new Map();first=false;mult=pendMult;pendMult=1;total=left=CFG.seconds;
   drawQ();$('fill').style.width='100%';$('fill').classList.remove('low');$('time').textContent='🔊';$('info').textContent='Đang đọc câu hỏi...';
   if(cur.music)bgmStop();else bgmStart();
   await speak(cur.music?'Quiz âm nhạc! Hãy lắng nghe và đoán tên bài hát.':'Câu số '+n+'. '+cur.q);if(my!==qseq)return;
@@ -330,7 +340,7 @@ function reveal(){qseq++;const my=qseq;cancelAll();clearInterval(timer);$('q').c
 function champ(f){const c=$('champ');$('cav').replaceChildren(avatar(f.u,'xl'));$('cname').textContent=f.u;$('ctime').textContent='⚡ '+f.el.toFixed(1)+'s · +'+f.g+' điểm';
   c.classList.remove('show');void c.offsetWidth;c.classList.add('show');sfx.fast();confetti(110)}
 function startGame(){genAI();if(!AC)try{AC=new(window.AudioContext||webkitAudioContext)()}catch(_){}if(AC&&AC.resume)AC.resume();sfx.start();
-  $('start').style.display='none';clearInterval(timer);cancelAll();queue=shuffle(BANK.filter(q=>!used.has(q.q)));procMsg=false;n=0;renderLB();nextQ()}
+  $('start').style.display='none';clearInterval(timer);cancelAll();fillBank();procMsg=false;n=0;renderLB();nextQ()}
 /* ---- Sự kiện từ live ---- */
 const setAv=(u,p)=>{if(p&&!AV.has(u))AV.set(u,p)};
 function join(u,p){setAv(u,p);if(!seen.has(u)){seen.add(u);notify('join','👋 '+u+' vừa tham gia',AV.get(u));sfx.join();$('viewers').textContent='👥 '+seen.size}}
@@ -354,7 +364,7 @@ $('bmute').onclick=()=>{bgmOn=!bgmOn;bgmLevel();$('st').textContent=bgmOn?'Đã 
 $('tmusic').onclick=()=>{if(!AC)startGame();else{n=CFG.musicEvery-1;if(phase==='reveal')nextQ();else reveal()}};
 $('bgf').onchange=e=>{const f=e.target.files[0];if(!f)return;if(bgm.el)bgm.el.pause();const a=new Audio(URL.createObjectURL(f));a.loop=true;bgm.el=a;clearInterval(bgm.timer);bgm.timer=null;try{AC.createMediaElementSource(a).connect(bgm.gain||(bgmStart(),bgm.gain))}catch(_){}if(bgm.want)bgmStart();$('mc').textContent='Nhạc nền: '+f.name};
 $('mf').onchange=e=>{const fs=[...e.target.files];fs.forEach(f=>MUSIC.push(parseSong(f.name,URL.createObjectURL(f))));mq=[];$('mc').textContent='Đã thêm '+fs.length+' bài. Quiz nhạc dùng '+MUSIC.filter(m=>m.url).length+' bài của bạn.'+(fs.length?' Mẫu: '+parseSong(fs[0].name).title+(parseSong(fs[0].name).artist?' – '+parseSong(fs[0].name).artist:''):'')};
-$('forget').onclick=()=>{used=new Set();saveUsed();usedM=new Set();saveUsedM();musicMsg=false;queue=shuffle(BANK);procMsg=false;$('qc').textContent='Đã xóa lịch sử câu hỏi và bài nhạc đã dùng'};
+$('forget').onclick=()=>{used=new Set();saveUsed();usedM=new Set();saveUsedM();musicMsg=false;queue=queue.filter(x=>x.src!=='bank');fillBank();procMsg=false;$('aist').textContent='Đã xóa lịch sử câu hỏi và bài nhạc đã dùng'};
 $('reset').onclick=()=>{scores=new Map();renderLB()};$('mute').onclick=()=>{muted=!muted;$('st').textContent=muted?'Đã tắt âm':'Đã bật âm'};
 const U=()=>$('u').value||'khach';
 document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>onChat(U(),b.dataset.c));
@@ -362,8 +372,8 @@ document.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{const[a,d]=b.dat
 $('jn').onclick=()=>join(U()+Math.random().toString(36).slice(2,5));$('lk').onclick=()=>onLike(U(),50);$('fl').onclick=()=>onFollow(U());
 $('bots').onclick=()=>{if(botT){clearInterval(botT);botT=null;return}botT=setInterval(()=>{const u='bot'+(1+Math.random()*15|0);onChat(u,L[Math.random()*4|0]);if(Math.random()<.05)onGift(u,'Rose',1);if(Math.random()<.1)onLike(u,5)},600)};
 $('addq').onclick=()=>{let k=0;$('nq').value.split('\n').forEach(l=>{const p=l.split('|').map(x=>x.trim());if(p.length<6)return;
-  const a=isNaN(p[5])?L.indexOf(p[5].toUpperCase()):+p[5]-1;if(a<0||a>3||p.slice(0,5).some(x=>!x))return;const o=p.slice(1,5),q={q:p[0],c:o[a],w:o.filter((_,i)=>i!==a)};BANK.push(q);queue.push(q);k++});
-  $('qc').textContent='Đã thêm '+k+' câu. Ngân hàng: '+BANK.length;if(k)$('nq').value=''};
+  const a=isNaN(p[5])?L.indexOf(p[5].toUpperCase()):+p[5]-1;if(a<0||a>3||p.slice(0,5).some(x=>!x))return;const o=p.slice(1,5);if(dup(p[0]))return;enqueue({q:p[0],c:o[a],w:o.filter((_,i)=>i!==a),src:'manual'});k++});
+  $('aist').textContent='Đã thêm '+k+' câu, sẽ phát ngay sau câu hiện tại.';if(k)$('nq').value=''};
 /* ---- Kết nối TikTok qua TikFinity Desktop (không cần Node.js) ---- */
 let ws=null,wantConn=false,evlog=[];
 function tf(m){const e=String(m.event||'').toLowerCase(),d=m.data||{};if(!e||e==='config'||!d)return;
@@ -383,5 +393,13 @@ function connectTT(){wantConn=true;if(ws&&ws.readyState<2)return;try{ws=new WebS
     ({chat:()=>onChat(d.user,d.comment),gift:()=>onGift(d.user,d.giftName,d.diamonds,d.count,d.avatar,d.giftPic),like:()=>onLike(d.user,d.count),follow:()=>onFollow(d.user),join:()=>join(d.user)})[d.type]?.()}}catch(_){}}}
 $('conn').onclick=connectTT;setTimeout(connectTT,1200);
 addEventListener('keydown',e=>{if(!/INPUT|TEXTAREA/.test(e.target.tagName)&&e.key.toLowerCase()==='h')document.body.classList.toggle('hide')});
-$('ht').textContent=CFG.likeTarget;$('qc').textContent='Ngân hàng: '+BANK.length+' câu ('+BANK.filter(q=>!used.has(q.q)).length+' chưa dùng)';$('hl').textContent=HOT.map(x=>x[0]+' - '+x[1]).join(' | ');rotateGuide();setInterval(rotateGuide,6000);renderLB();meter();
+$('ht').textContent=CFG.likeTarget;try{queue=JSON.parse(localStorage.getItem('quizQ')||'[]').filter(x=>x&&x.q&&!used.has(x.q))}catch(_){}fillBank();
+$('fans').innerHTML=[0,1,2,3].map(i=>'<div class=a><input type=radio name=fc value='+i+(i?'':' checked')+'><b>'+L[i]+'</b><input type=text class=fa placeholder="Đáp án '+L[i]+'"></div>').join('');
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));['ai','hand','bulk'].forEach(t=>$('t-'+t).hidden=t!==b.dataset.t)});
+$('fadd').onclick=()=>{const q=$('fq').value.trim(),o=[...document.querySelectorAll('.fa')].map(i=>i.value.trim()),a=+document.querySelector('[name=fc]:checked').value,m=$('aist');
+  if(!q||o.some(x=>!x)||new Set(o.map(norm)).size<4){m.textContent='Cần có câu hỏi và đủ 4 đáp án khác nhau.';return}
+  if(dup(q)){m.textContent='Câu này đã có hoặc đã được dùng rồi.';return}
+  enqueue({q,c:o[a],w:o.filter((_,i)=>i!==a),src:'manual'});$('fq').value='';document.querySelectorAll('.fa').forEach(i=>i.value='');$('fq').focus();m.textContent='✓ Đã thêm, sẽ phát ngay sau câu hiện tại.'};
+$('t-hand').onkeydown=e=>{if(e.key==='Enter')$('fadd').click()};
+$('hl').textContent=HOT.map(x=>x[0]+' - '+x[1]).join(' | ');rotateGuide();setInterval(rotateGuide,6000);renderLB();meter();
 </script></body></html>
