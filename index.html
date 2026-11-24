@@ -89,7 +89,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
   <b>Bảng điều khiển</b> <small>(ấn H để ẩn khi live)</small>
   <h4>Câu hỏi</h4>
   <div class="tabs"><button class="on" data-t="ai">🤖 AI tạo</button><button data-t="hand">✍ Tự nhập</button><button data-t="bulk">📋 Dán nhiều</button></div>
-  <div id="t-ai"><input id="akey" type="password" placeholder="Dán Anthropic API key (sk-ant-...)" hidden><input id="aitopic" placeholder="Chủ đề (trống = AI tự đổi chủ đề)"><div class="g"><button id="aigo">Tạo thêm 10 câu</button><button id="aiauto">Tự động bổ sung: bật</button></div></div>
+  <div id="t-ai"><input id="akey" type="password" placeholder="Dán API key Gemini (AIza...) hoặc Claude (sk-ant-...)" hidden><input id="aitopic" placeholder="Chủ đề (trống = AI tự đổi chủ đề)"><div class="g"><button id="aigo">Tạo thêm 10 câu</button><button id="aiauto">Tự động bổ sung: bật</button></div></div>
   <div id="t-hand" hidden><input id="fq" placeholder="Gõ câu hỏi..."><div id="fans"></div><button id="fadd">+ Thêm câu này</button><small> Chọn nút tròn ở đáp án đúng · Enter để thêm</small></div>
   <div id="t-bulk" hidden><textarea id="nq" rows="4" placeholder="Mỗi dòng: Câu hỏi | A | B | C | D | đáp án đúng (A-D)"></textarea><button id="addq">Thêm tất cả</button></div>
   <small id="aist" style="display:block;margin-top:6px">Chưa có AI ở bản này (cần mở bản trên Claude). Vẫn tự nhập được.</small>
@@ -289,19 +289,23 @@ $('addm').onclick=async()=>{const ls=$('nm').value.split('\n').map(l=>l.trim()).
 /* ---- Câu hỏi: hàng đợi (✍ bạn nhập > 🤖 AI > 📚 có sẵn); AI tự bổ sung để không hết/lặp ---- */
 let sample=null,aiAuto=true,aiWait=0,aiP=null;const PR={manual:0,ai:1,bank:2},TOPICS=['địa lý Việt Nam','lịch sử Việt Nam','ẩm thực & văn hóa','khoa học đời sống','động vật & thiên nhiên','thể thao','công nghệ & internet','phim, hoạt hình, âm nhạc','toán đố vui','văn học & thành ngữ','địa lý thế giới','cơ thể & sức khỏe','từ vựng tiếng Anh','vũ trụ','lễ hội & phong tục'];
 try{window.claude&&claude.use('sample').then(x=>{if(x){sample=x;$('aist').textContent='✓ AI sẵn sàng: tự viết thêm câu khi sắp hết.'}}).catch(()=>{})}catch(_){}
-const MODELS=['claude-sonnet-5-5','claude-haiku-5-5'];let memKey='';
+const MODELS={gemini:['gemini-flash-latest','gemini-2.5-flash','gemini-2.0-flash'],claude:['claude-sonnet-5-5','claude-haiku-5-5']};let memKey='';
+const isClaudeKey=k=>/^sk-ant-/i.test(k);
+async function callAI(p){const k=KEY(),cl=isClaudeKey(k);let last;
+  for(const m of cl?MODELS.claude:MODELS.gemini){let r;
+    try{r=cl?await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:m,max_tokens:4000,messages:[{role:'user',content:p}]})})
+      :await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':k},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json',temperature:1}})})}
+    catch(x){const e=new Error('Không kết nối được tới máy chủ AI ('+(x&&x.message||x)+')');e.code='net';throw e}
+    if(!r.ok){let msg='';try{msg=(await r.json()).error.message}catch(_){}const e=new Error('HTTP '+r.status+(msg?': '+msg:''));
+      e.code=r.status===429?'rate_limited':(r.status===401||r.status===403||/api key/i.test(msg))?'bad_key':'err';
+      if(e.code!=='bad_key'&&(r.status===404||(r.status===400&&/model/i.test(msg)))){last=e;continue}throw e}
+    const j=await r.json(),t=cl?j.content.map(c=>c.text||'').join(''):((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(c=>c.text||'').join(''),a=t.indexOf('['),b=t.lastIndexOf(']');
+    if(a<0||b<a)throw new Error('AI không trả về JSON hợp lệ');return JSON.parse(t.slice(a,b+1))}
+  throw last||new Error('Không có model khả dụng')}
 function useKey(){const k=KEY();
   if(!k){if(sample&&sample.byKey)sample=null;$('aist').textContent=sample?'✓ AI sẵn sàng.':'Dán API key vào ô trên để bật AI.';return}
-  sample={byKey:true,json:async p=>{let last;for(const m of MODELS){let r;
-    try{r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':KEY(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:m,max_tokens:4000,messages:[{role:'user',content:p}]})})}
-    catch(x){const e=new Error('Không kết nối được tới api.anthropic.com ('+(x&&x.message||x)+')');e.code='net';throw e}
-    if(!r.ok){let msg='';try{msg=(await r.json()).error.message}catch(_){}const e=new Error('HTTP '+r.status+(msg?': '+msg:''));
-      e.code=r.status===429?'rate_limited':(r.status===401||r.status===403)?'bad_key':'err';
-      if(r.status===404||(r.status===400&&/model/i.test(msg))){last=e;continue}throw e}
-    const t=(await r.json()).content.map(c=>c.text||'').join(''),a=t.indexOf('['),b=t.lastIndexOf(']');
-    if(a<0||b<a)throw new Error('AI không trả về JSON hợp lệ');return JSON.parse(t.slice(a,b+1))}
-    throw last||new Error('Không có model khả dụng')}};
-  $('aist').textContent='✓ AI sẵn sàng (dùng API key của bạn).'}
+  sample={byKey:true,json:callAI};
+  $('aist').textContent='✓ AI sẵn sàng ('+(isClaudeKey(k)?'Claude':'Gemini')+').'}
 const KEY=()=>memKey||(()=>{try{return localStorage.getItem('quizKey')||''}catch(_){return ''}})();
 const setKey=()=>{memKey=$('akey').value.trim();try{localStorage.setItem('quizKey',memKey)}catch(_){}aiWait=0;useKey()};
 setTimeout(()=>{if(sample)return;$('akey').hidden=false;if(!$('akey').value)$('akey').value=KEY();memKey=$('akey').value.trim();useKey()},1500);$('akey').onchange=setKey;$('akey').oninput=setKey;
