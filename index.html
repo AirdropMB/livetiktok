@@ -49,11 +49,12 @@ body{display:flex;justify-content:center;gap:16px}
 .eq{display:none;gap:.6vh;align-items:flex-end;height:6vh;margin-right:2vh;flex:none}.eq i{width:1.1vh;height:25%;background:var(--gold);border-radius:3px}
 #q.music .eq{display:flex}#q.eqon .eq i{animation:eq .55s infinite alternate}.eq i:nth-child(2){animation-delay:.1s!important}.eq i:nth-child(3){animation-delay:.25s!important}.eq i:nth-child(4){animation-delay:.05s!important}.eq i:nth-child(5){animation-delay:.2s!important}
 @keyframes eq{to{height:100%}}
+#feed .nt span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-width:0}
 #feed{height:6.8vh;flex:none;overflow:hidden;display:flex;flex-direction:column;justify-content:center;pointer-events:none}
-.nt{border-radius:1.8vh;padding:1.2vh 2vh;font-size:2.7vh;font-weight:800;animation:in .35s,out .4s 3.2s forwards;background:var(--card2);box-shadow:0 .6vh 2vh rgba(0,0,0,.4)}
-.nt.join{background:#1d4d46;color:var(--mint);font-size:2.3vh;padding:.8vh 1.6vh;width:fit-content}
-.nt.first{background:#294a8d}.nt.fast{background:var(--gold);color:var(--bg);font-size:3.2vh}
-.nt.gift{background:var(--coral);color:#fff}.nt.big{background:linear-gradient(90deg,#ff5c7a,#ffd23f);color:#2a0b1e;font-size:3.4vh}
+.nt{border-radius:1.8vh;padding:.6vh 1.6vh;font-size:2.4vh;line-height:1.05;max-width:100%;font-weight:800;animation:in .35s,out .4s 3.2s forwards;background:var(--card2);box-shadow:0 .6vh 2vh rgba(0,0,0,.4)}
+.nt.join{background:#1d4d46;color:var(--mint);font-size:2.2vh;padding:.6vh 1.6vh;width:fit-content}
+.nt.first{background:#294a8d}.nt.fast{background:var(--gold);color:var(--bg);font-size:2.5vh}
+.nt.gift{background:var(--coral);color:#fff}.nt.big{background:linear-gradient(90deg,#ff5c7a,#ffd23f);color:#2a0b1e;font-size:2.5vh}
 .nt.streak{background:#ff8a3d;color:#3a1500}
 @keyframes in{from{transform:translateX(-110%)}to{transform:none}}@keyframes out{to{opacity:0;transform:translateY(-3vh)}}
 #fx{position:absolute;inset:0;pointer-events:none;z-index:6}
@@ -89,7 +90,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
   <b>Bảng điều khiển</b> <small>(ấn H để ẩn khi live)</small>
   <h4>Câu hỏi</h4>
   <div class="tabs"><button class="on" data-t="ai">🤖 AI tạo</button><button data-t="hand">✍ Tự nhập</button><button data-t="bulk">📋 Dán nhiều</button></div>
-  <div id="t-ai"><input id="akey" type="password" placeholder="Dán API key Groq (gsk_...), Gemini (AIza...) hoặc Claude (sk-ant-...)" hidden><input id="aitopic" placeholder="Chủ đề (trống = AI tự đổi chủ đề)"><div class="g"><button id="aigo">Tạo thêm câu ngay</button><button id="aiauto">Tự động bổ sung: bật</button></div></div>
+  <div id="t-ai"><input id="akey" type="password" placeholder="Dán API key Groq (gsk_...), Gemini (AIza...) hoặc Claude (sk-ant-...)" hidden><input id="aitopic" placeholder="Chủ đề (trống = AI tự đổi chủ đề)"><div class="g"><button id="aigo">Tạo thêm câu ngay</button><button id="aiauto">Tự động bổ sung: bật</button><button id="airegen">🔄 Tạo lại toàn bộ câu hỏi</button></div></div>
   <div id="t-hand" hidden><input id="fq" placeholder="Gõ câu hỏi..."><div id="fans"></div><button id="fadd">+ Thêm câu này</button><small> Chọn nút tròn ở đáp án đúng · Enter để thêm</small></div>
   <div id="t-bulk" hidden><textarea id="nq" rows="4" placeholder="Mỗi dòng: Câu hỏi | A | B | C | D | đáp án đúng (A-D)"></textarea><button id="addq">Thêm tất cả</button></div>
   <small id="aist" style="display:block;margin-top:6px">Chưa có AI ở bản này (cần mở bản trên Claude). Vẫn tự nhập được.</small>
@@ -115,9 +116,9 @@ const CFG={seconds:10,revealSeconds:7,musicEvery:2,afterSec:6,minAfter:4,clipSec
   // pts: điểm cộng thẳng cho người tặng · shield: lá chắn giữ chuỗi đúng khi lỡ 1 câu · hint: loại 2 đáp án sai (cả phòng)
   // mult/nq: nhân điểm cả phòng trong nq câu · vip/vm: người tặng được nhân vm điểm trong vip câu tới
   tiers:[
-   {min:3000,type:'royal',eg:'Ferris Wheel',pts:1000,shield:1,mult:3,nq:2,vip:5,vm:2,short:'x3 điểm cả phòng 2 câu · bạn x2 điểm 5 câu · +1000đ',label:'👑 x3 điểm cả phòng 2 câu, bạn x2 điểm 5 câu, +1000 điểm, lá chắn'},
-   {min:500,type:'mega',eg:'Mỏ vàng',pts:500,shield:1,mult:3,nq:1,vip:3,vm:2,short:'x3 điểm cả phòng · bạn x2 điểm 3 câu · +500đ',label:'x3 điểm cả phòng, bạn x2 điểm 3 câu, +500 điểm, lá chắn'},
-   {min:100,type:'big',eg:'Du lịch',pts:200,shield:1,mult:2,nq:1,vip:2,vm:2,short:'x2 điểm cả phòng · bạn x2 điểm 2 câu · +200đ',label:'x2 điểm cả phòng, bạn x2 điểm 2 câu, +200 điểm, lá chắn'},
+   {min:3000,type:'royal',eg:'Ferris Wheel',pts:1000,shield:1,mult:3,nq:2,vip:5,vm:2,short:'x3 cả phòng 2 câu, bạn x2 5 câu, +1000đ',label:'👑 x3 điểm cả phòng 2 câu, bạn x2 điểm 5 câu, +1000 điểm, lá chắn'},
+   {min:500,type:'mega',eg:'Mỏ vàng',pts:500,shield:1,mult:3,nq:1,vip:3,vm:2,short:'x3 cả phòng, bạn x2 3 câu, +500đ',label:'x3 điểm cả phòng, bạn x2 điểm 3 câu, +500 điểm, lá chắn'},
+   {min:100,type:'big',eg:'Du lịch',pts:200,shield:1,mult:2,nq:1,vip:2,vm:2,short:'x2 cả phòng, bạn x2 2 câu, +200đ',label:'x2 điểm cả phòng, bạn x2 điểm 2 câu, +200 điểm, lá chắn'},
    {min:20,type:'hint',eg:'Nước hoa',pts:100,shield:1,hint:1,short:'loại 2 đáp án sai · +100đ · lá chắn',label:'loại 2 đáp án sai, +100 điểm, lá chắn giữ chuỗi'},
    {min:5,type:'shield',eg:'Finger Heart',pts:50,shield:1,short:'+50đ · lá chắn giữ chuỗi đúng',label:'+50 điểm, lá chắn giữ chuỗi'},
    {min:1,type:'pts',eg:'TikTok',pts:20,short:'+20 điểm',label:'+20 điểm'}]};
@@ -379,6 +380,12 @@ async function genRun(){$('aist').textContent='🤖 AI đang viết câu hỏi..
   catch(e){if(e&&e.code==='not_granted'){aiAuto=false;$('aiauto').textContent='Tự động bổ sung: tắt';$('aist').textContent='Bạn đã từ chối quyền cho AI.'}
     else{aiWait=Date.now()+(e&&e.code==='rate_limited'?45000:10000);$('aist').textContent=(e&&e.code==='bad_key'?'API key không đúng hoặc hết hạn mức. ':'Lỗi AI, sẽ thử lại sau. ')+(e&&e.message||e)}}}
 setInterval(()=>{if(aiAuto&&sample&&queue.filter(x=>x.src==='ai').length<15)genAI()},4000);
+$('airegen').onclick=async()=>{const b=$('airegen');if(b.disabled)return;b.disabled=true;
+  queue=queue.filter(x=>x.src==='manual');saveQ();renderQ();$('aitopic').value='';lastT='';
+  if(!sample){fillBank();renderQ();$('aist').textContent='Đã xáo lại ngân hàng câu có sẵn. Dán API key (hoặc mở bản có AI) để tạo câu mới theo hot trend.';b.disabled=false;return}
+  $('aist').textContent='🔄 Đang tạo lại toàn bộ câu hỏi (chủ đề ngẫu nhiên, ưu tiên hot trend)...';aiWait=0;
+  for(let i=0;i<2;i++){await genAI(true);if(Date.now()<aiWait)break}
+  fillBank();renderQ();b.disabled=false}
 $('aigo').onclick=()=>{aiWait=0;genAI()};$('aiauto').onclick=()=>{aiAuto=!aiAuto;$('aiauto').textContent='Tự động bổ sung: '+(aiAuto?'bật':'tắt')};
 /* ---- Luồng game: mỗi câu chỉ xuất hiện 1 lần, hết ngân hàng thì phát lại ---- */
 const mk=(q,c,w)=>{const o=shuffle([c,...w]);return{q,o,a:o.indexOf(c)}};
@@ -425,7 +432,7 @@ function onGift(u,name,dia,cnt=1,p,pic){join(u,p);const v=dia*cnt,s=sc(u),t=tier
   if(t.mult){boost(t.mult);if(t.nq>1){carryM=t.mult;carryQ=t.nq-1}}
   if(t.hint){if(phase==='question'||phase==='intro'||phase==='listen')applyHint();else pendHint=true}
   const big=t.type==='big'||t.type==='mega'||t.type==='royal';
-  notify(big?'big':'gift',head+t.label+'!',img);
+  notify(big?'big':'gift','🎁 '+String(u).slice(0,14)+' tặng '+name+tag+': '+t.short+'!',img);
   if(big){sfx.big();confetti(t.type==='royal'?260:t.type==='mega'?220:160);shake()}else{sfx.gift();confetti(t.hint?60:30)}
   renderLB(u)}
 /* Mục tiêu tim không cố định: tăng theo số người xem và tăng dần sau mỗi lần đạt */
