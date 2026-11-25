@@ -489,4 +489,12 @@ $('fadd').onclick=()=>{const q=$('fq').value.trim(),o=[...document.querySelector
   enqueue({q,c:o[a],w:o.filter((_,i)=>i!==a),src:'manual'});$('fq').value='';document.querySelectorAll('.fa').forEach(i=>i.value='');$('fq').focus();m.textContent='✓ Đã thêm, sẽ phát ngay sau câu hiện tại.'};
 $('t-hand').onkeydown=e=>{if(e.key==='Enter')$('fadd').click()};
 $('hl').textContent=HOT.map(x=>x[0]+' - '+x[1]).join(' | ');rotateGuide();setInterval(rotateGuide,6000);renderLB();meter();
+
+/* Chế độ live: mở trang với #live (hoặc ?live) để tự ẩn bảng điều khiển và tự bắt đầu, không cần bấm nút.
+   Muốn tự bật AI: thêm #live&key=API_KEY vào cuối link (chỉ dùng link này cho TikTok LIVE Studio, đừng chia sẻ). */
+(()=>{const q=location.search+location.hash;if(!/(^|[?&#])live\b/.test(q))return;
+  document.body.classList.add('hide');
+  const m=location.hash.match(/key=([^&]+)/);if(m){try{$('akey').value=decodeURIComponent(m[1]);$('akey').hidden=false;setKey()}catch(_){}}
+  setTimeout(()=>{if(phase==='idle')startGame()},2500);
+  ['pointerdown','keydown','click'].forEach(ev=>addEventListener(ev,()=>{if(AC&&AC.resume)AC.resume()},{passive:true}))})();
 </script></body></html>
